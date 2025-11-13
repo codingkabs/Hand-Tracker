@@ -7,6 +7,7 @@ import cv2
 import random
 import time
 from base import HandTracker
+from fullscreen_helper import setup_fullscreen_window, resize_frame_for_fullscreen, toggle_fullscreen
 
 def detect_gesture(landmarks, tracker):
     """Detect rock, paper, or scissors gesture"""
@@ -67,6 +68,7 @@ def main():
     print("=" * 60)
     print("\nFirst to 5 points wins!")
     print("Press 'S' or click START button to begin")
+    print("Press 'F' to toggle fullscreen")
     print("Press ESC to exit\n")
     
     # Game state
@@ -79,11 +81,15 @@ def main():
     computer_choice = None
     result_text = None
     last_frame_time = time.time()
+    fullscreen = setup_fullscreen_window('Rock Paper Scissors', start_fullscreen=True)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
+        
+        # Resize for fullscreen
+        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         current_time = time.time()
         frame_time = current_time - last_frame_time
@@ -235,8 +241,11 @@ def main():
         
         cv2.imshow('Rock Paper Scissors', frame)
         
-        if cv2.waitKey(1) & 0xFF == 27:  # ESC
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
             break
+        elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
+            fullscreen = toggle_fullscreen('Rock Paper Scissors', fullscreen)
     
     tracker.release()
     print("\nThanks for playing!")

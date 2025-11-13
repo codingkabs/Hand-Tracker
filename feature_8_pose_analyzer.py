@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import time
 from base import HandTracker
+from fullscreen_helper import setup_fullscreen_window, resize_frame_for_fullscreen, toggle_fullscreen
 
 class PoseAnalyzer:
     def __init__(self):

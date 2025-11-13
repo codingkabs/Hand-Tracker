@@ -6,6 +6,7 @@ Author: Kabir Suri (codingkabs)
 import cv2
 import numpy as np
 from base import HandTracker
+from fullscreen_helper import setup_fullscreen_window, resize_frame_for_fullscreen, toggle_fullscreen
 
 def calculate_finger_angles(landmarks, tracker):
     """Calculate angles for each finger to determine extension"""
@@ -287,6 +288,7 @@ def main():
     print("\nThis detector recognizes ASL letters A-Z")
     print("Show hand signs clearly in front of the camera")
     print("Press 'L' to toggle learning mode")
+    print("Press 'F' to toggle fullscreen")
     print("Press ESC to exit\n")
     
     confidence_threshold = 5  # Frames needed for stable detection
@@ -294,11 +296,15 @@ def main():
     letter_count = 0
     learning_mode = False
     last_button_state = False  # For button debounce
+    fullscreen = setup_fullscreen_window('ASL Sign Language Detector', start_fullscreen=True)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
+        
+        # Resize for fullscreen
+        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         
@@ -411,6 +417,8 @@ def main():
             break
         elif key == ord('l') or key == ord('L'):  # Toggle learning mode
             learning_mode = not learning_mode
+        elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
+            fullscreen = toggle_fullscreen('ASL Sign Language Detector', fullscreen)
     
     tracker.release()
     print("\nThank you for using the ASL Detector!")

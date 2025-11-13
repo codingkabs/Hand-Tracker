@@ -5,6 +5,7 @@ Draw in the air with your finger - different gestures change colors
 import cv2
 import numpy as np
 from base import HandTracker
+from fullscreen_helper import setup_fullscreen_window, resize_frame_for_fullscreen, toggle_fullscreen
 
 class VirtualCanvas:
     def __init__(self, width, height):
@@ -52,22 +53,28 @@ def main():
         return
     
     print("Virtual Drawing - Press ESC to exit")
+    print("Press 'F' to toggle fullscreen")
     print("Controls:")
     print("  - Index finger up: Draw")
-    print("  - Fist: Clear canvas")
-    print("  - Open hand: Change color")
-    print("  - V gesture: Erase mode")
+    print("  - Fist: Toggle erase/draw mode")
+    print("  - Open hand (5 fingers): Change color")
     
-    canvas = VirtualCanvas(1280, 720)
+    fullscreen = setup_fullscreen_window('Virtual Drawing', start_fullscreen=True)
+    canvas = VirtualCanvas(1920, 1080)  # Match fullscreen size
     erase_mode = False
+    last_finger_count = 0
+    last_fist_state = False
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
         
-        # Resize frame to match canvas
-        frame = cv2.resize(frame, (1280, 720))
+        # Resize for fullscreen
+        frame, offset_info = resize_frame_for_fullscreen(frame)
+        # Resize canvas to match frame
+        if frame.shape[:2] != canvas.canvas.shape[:2]:
+            canvas.canvas = cv2.resize(canvas.canvas, (frame.shape[1], frame.shape[0]))
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         
@@ -80,20 +87,24 @@ def main():
             index_tip = landmarks['index_tip']
             finger_count = tracker.get_finger_count(landmarks)
             
-            # Gesture controls
-            if finger_count == 0:  # Fist - Clear
-                canvas.clear()
-                cv2.putText(frame, "CLEARED!", (50, 50), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
-            elif finger_count == 5:  # Open hand - Change color
+            # Gesture controls with debounce
+            # Fist (0 fingers) - Toggle erase/draw mode
+            if finger_count == 0:
+                if not last_fist_state:  # Only toggle once when fist is first made
+                    erase_mode = not erase_mode
+                    last_fist_state = True
+                    cv2.putText(frame, f"MODE: {'ERASE' if erase_mode else 'DRAW'}", (50, 50), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+            else:
+                last_fist_state = False
+            
+            # Open hand (5 fingers) - Change color (only once per gesture)
+            if finger_count == 5 and last_finger_count != 5:
                 canvas.change_color()
                 cv2.putText(frame, "COLOR CHANGED!", (50, 50), 
                            cv2.FONT_HERSHEY_SIMPLEX, 1.5, canvas.current_color, 3)
-            elif finger_count == 2:  # V gesture - Toggle erase
-                if tracker.is_finger_up(landmarks, 'index') and tracker.is_finger_up(landmarks, 'middle'):
-                    erase_mode = not erase_mode
-                    cv2.putText(frame, f"ERASE: {'ON' if erase_mode else 'OFF'}", (50, 50), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 3)
+            
+            last_finger_count = finger_count
             
             # Drawing mode
             if tracker.is_finger_up(landmarks, 'index') and finger_count <= 2:
@@ -126,8 +137,11 @@ def main():
         
         cv2.imshow('Virtual Drawing', blended)
         
-        if cv2.waitKey(1) & 0xFF == 27:
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
             break
+        elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
+            fullscreen = toggle_fullscreen('Virtual Drawing', fullscreen)
     
     tracker.release()
 

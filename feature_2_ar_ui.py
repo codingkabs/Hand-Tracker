@@ -5,6 +5,7 @@ Futuristic AR UI with scary colors
 import cv2
 import numpy as np
 from base import HandTracker
+from fullscreen_helper import setup_fullscreen_window, resize_frame_for_fullscreen, toggle_fullscreen
 
 # Colors for UI overlays (scary/horror theme)
 CYAN = (0, 0, 139)  # Dark red/crimson
@@ -71,11 +72,17 @@ def main():
         return
     
     print("AR UI Overlay - Press ESC to exit")
+    print("Press 'F' to toggle fullscreen")
+    
+    fullscreen = setup_fullscreen_window('Hand Tracking AR UI', start_fullscreen=True)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
+        
+        # Resize for fullscreen
+        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         
@@ -134,8 +141,11 @@ def main():
                            cv2.FONT_HERSHEY_SIMPLEX, 1, ORANGE, 3)
         
         cv2.imshow('Hand Tracking AR UI', frame)
-        if cv2.waitKey(1) & 0xFF == 27:
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
             break
+        elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
+            fullscreen = toggle_fullscreen('Hand Tracking AR UI', fullscreen)
     
     tracker.release()
 

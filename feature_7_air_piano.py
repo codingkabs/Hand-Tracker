@@ -5,6 +5,7 @@ Play virtual piano keys with finger taps
 import cv2
 import numpy as np
 from base import HandTracker
+from fullscreen_helper import setup_fullscreen_window, resize_frame_for_fullscreen, toggle_fullscreen
 
 class PianoKey:
     def __init__(self, x, y, width, height, note, color, is_black=False):
@@ -103,8 +104,10 @@ def main():
         return
     
     print("Air Piano - Press ESC to exit")
+    print("Press 'F' to toggle fullscreen")
     print("Point your index finger at keys to play notes!")
     
+    fullscreen = setup_fullscreen_window('Air Piano', start_fullscreen=True)
     piano = None
     last_note = None
     note_display_time = 0
@@ -113,6 +116,9 @@ def main():
         frame, results = tracker.get_frame()
         if frame is None:
             break
+        
+        # Resize for fullscreen
+        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         # Initialize piano with frame dimensions
         if piano is None:
@@ -156,8 +162,11 @@ def main():
         
         cv2.imshow('Air Piano', frame)
         
-        if cv2.waitKey(1) & 0xFF == 27:
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
             break
+        elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
+            fullscreen = toggle_fullscreen('Air Piano', fullscreen)
     
     tracker.release()
 

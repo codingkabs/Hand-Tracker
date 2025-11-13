@@ -6,6 +6,7 @@ Author: Kabir Suri (codingkabs)
 import cv2
 import numpy as np
 from base import HandTracker
+from fullscreen_helper import setup_fullscreen_window, resize_frame_for_fullscreen, toggle_fullscreen
 
 # Enhanced color scheme (scary/horror theme with variations)
 DARK_RED = (0, 0, 139)      # Dark red/crimson
@@ -118,14 +119,19 @@ def main():
     print("  - Open Hand: Full AR UI overlay")
     print("  - Pinch Gesture: Show pinch intensity")
     print("  - Fist: Simple indicator")
+    print("  - Press 'F' to toggle fullscreen")
     print("  - ESC: Exit\n")
     
     frame_count = 0
+    fullscreen = setup_fullscreen_window('Hand Tracking AR UI - Enhanced', start_fullscreen=True)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
+        
+        # Resize for fullscreen
+        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         frame_count += 1
         pulse = frame_count * 0.1  # For animation
@@ -229,8 +235,11 @@ def main():
         
         cv2.imshow('Hand Tracking AR UI - Enhanced', frame)
         
-        if cv2.waitKey(1) & 0xFF == 27:  # ESC key
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
             break
+        elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
+            fullscreen = toggle_fullscreen('Hand Tracking AR UI - Enhanced', fullscreen)
     
     tracker.release()
     print("\nApplication closed. Thank you for using Hand Tracking AR UI!")
