@@ -117,9 +117,13 @@ def main():
                 canvas.drawing = False
                 canvas.last_point = None
         
-        # Blend canvas with camera feed
-        alpha = 0.7
-        blended = cv2.addWeighted(frame, 1-alpha, canvas.canvas, alpha, 0)
+        # Overlay canvas on camera feed (keep camera feed at full color)
+        # Only blend the drawn parts, not the white background
+        blended = frame.copy()
+        # Create mask for drawn pixels (non-white areas)
+        mask = cv2.inRange(canvas.canvas, (0, 0, 0), (253, 253, 253))
+        # Only blend where there's actual drawing
+        blended[mask > 0] = cv2.addWeighted(frame[mask > 0], 0.4, canvas.canvas[mask > 0], 0.6, 0)
         
         # Show current color indicator
         color_rect = np.zeros((50, 200, 3), dtype=np.uint8)

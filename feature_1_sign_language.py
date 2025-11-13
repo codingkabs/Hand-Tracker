@@ -308,6 +308,7 @@ def main():
         
         detected_letter = "No Hand"
         finger_count = 0
+        display_letter = "No Hand"  # Initialize display_letter
         
         if landmarks_list:
             landmarks = landmarks_list[0]

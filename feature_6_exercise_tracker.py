@@ -1,6 +1,6 @@
 """
-Feature 6: Full Body Exercise Tracker
-Tracks push-ups and outlines body when standing
+Feature 6: Full Body Exercise Tracker with Calibration
+Tracks exercises with position calibration for accurate rep counting
 Author: Kabir Suri (codingkabs)
 """
 import cv2
@@ -8,35 +8,52 @@ import time
 import numpy as np
 from pose_base import PoseTracker
 
-class PushUpTracker:
+class ExerciseTracker:
     def __init__(self):
         self.reps = 0
-        self.last_state = "up"  # "up" or "down"
         self.exercise_start_time = time.time()
         self.rep_times = []
-        self.is_down = False
+        self.position_1 = None  # First position (e.g., up for push-ups)
+        self.position_2 = None  # Second position (e.g., down for push-ups)
+        self.current_state = "position_1"  # Which position we're currently in
+        self.is_calibrated = False
     
-    def update(self, shoulder_y, wrist_y, hip_y):
-        """Track push-up based on body position"""
-        # Push-up detection: when shoulders are below wrists (down position)
-        # and then back up
-        
-        if shoulder_y is None or wrist_y is None:
+    def set_position_1(self, key_point_y):
+        """Set the first position (e.g., up position)"""
+        self.position_1 = key_point_y
+    
+    def set_position_2(self, key_point_y):
+        """Set the second position (e.g., down position)"""
+        self.position_2 = key_point_y
+        self.is_calibrated = True
+    
+    def update(self, current_y):
+        """Track reps based on calibrated positions"""
+        if not self.is_calibrated or self.position_1 is None or self.position_2 is None:
             return False
         
-        # Calculate if in down position (shoulders below wrists by threshold)
-        threshold = 50  # pixels
-        currently_down = shoulder_y > (wrist_y + threshold)
+        # Calculate thresholds (midpoint between positions)
+        threshold = (self.position_1 + self.position_2) / 2
         
-        # Detect transition from up to down, then down to up = one rep
-        if not self.is_down and currently_down:
-            # Just went down
-            self.is_down = True
-        elif self.is_down and not currently_down:
-            # Just came back up - count as rep
+        # Determine which position we're closer to
+        dist_to_pos1 = abs(current_y - self.position_1)
+        dist_to_pos2 = abs(current_y - self.position_2)
+        
+        # Determine current state
+        if dist_to_pos1 < dist_to_pos2:
+            new_state = "position_1"
+        else:
+            new_state = "position_2"
+        
+        # Detect transition: position_1 -> position_2 -> position_1 = one rep
+        if self.current_state == "position_1" and new_state == "position_2":
+            # Moved from position 1 to position 2
+            self.current_state = "position_2"
+        elif self.current_state == "position_2" and new_state == "position_1":
+            # Completed a rep! (went from pos2 back to pos1)
             self.reps += 1
             self.rep_times.append(time.time())
-            self.is_down = False
+            self.current_state = "position_1"
             return True
         
         return False
@@ -54,27 +71,59 @@ class PushUpTracker:
         self.reps = 0
         self.rep_times = []
         self.exercise_start_time = time.time()
-        self.is_down = False
+        self.is_calibrated = False
+        self.position_1 = None
+        self.position_2 = None
+        self.current_state = "position_1"
 
-def detect_standing(landmarks_dict):
-    """Detect if person is standing (hips below shoulders)"""
+def get_key_point_y(landmarks_dict, exercise_type="pushup"):
+    """Get the key point Y coordinate based on exercise type"""
     if not landmarks_dict:
-        return False
+        return None
     
-    left_shoulder = landmarks_dict.get('left_shoulder')
-    right_shoulder = landmarks_dict.get('right_shoulder')
-    left_hip = landmarks_dict.get('left_hip')
-    right_hip = landmarks_dict.get('right_hip')
+    if exercise_type == "pushup":
+        # For push-ups, use average shoulder Y position
+        left_shoulder = landmarks_dict.get('left_shoulder')
+        right_shoulder = landmarks_dict.get('right_shoulder')
+        if left_shoulder and right_shoulder:
+            return (left_shoulder[1] + right_shoulder[1]) / 2
+    elif exercise_type == "shoulder_raise":
+        # For shoulder raises, use average wrist Y position
+        left_wrist = landmarks_dict.get('left_wrist')
+        right_wrist = landmarks_dict.get('right_wrist')
+        if left_wrist and right_wrist:
+            return (left_wrist[1] + right_wrist[1]) / 2
+    elif exercise_type == "squat":
+        # For squats, use average hip Y position
+        left_hip = landmarks_dict.get('left_hip')
+        right_hip = landmarks_dict.get('right_hip')
+        if left_hip and right_hip:
+            return (left_hip[1] + right_hip[1]) / 2
     
-    if not all([left_shoulder, right_shoulder, left_hip, right_hip]):
-        return False
+    return None
+
+def draw_countdown(frame, countdown_number, message=""):
+    """Draw countdown on frame"""
+    text = str(countdown_number) if countdown_number > 0 else "GO!"
+    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 5, 10)[0]
+    text_x = (frame.shape[1] - text_size[0]) // 2
+    text_y = (frame.shape[0] + text_size[1]) // 2
     
-    # Average shoulder and hip positions
-    avg_shoulder_y = (left_shoulder[1] + right_shoulder[1]) / 2
-    avg_hip_y = (left_hip[1] + right_hip[1]) / 2
+    # Background
+    cv2.rectangle(frame, (text_x - 50, text_y - text_size[1] - 50),
+                 (text_x + text_size[0] + 50, text_y + 50), (0, 0, 0), -1)
     
-    # Standing: hips are below shoulders
-    return avg_hip_y > avg_shoulder_y
+    # Countdown text
+    color = (0, 255, 0) if countdown_number == 0 else (0, 255, 255)
+    cv2.putText(frame, text, (text_x, text_y),
+               cv2.FONT_HERSHEY_SIMPLEX, 5, color, 10)
+    
+    # Message
+    if message:
+        msg_size = cv2.getTextSize(message, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)[0]
+        msg_x = (frame.shape[1] - msg_size[0]) // 2
+        cv2.putText(frame, message, (msg_x, text_y - 100),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
 
 def main():
     tracker = PoseTracker()
@@ -84,24 +133,32 @@ def main():
         return
     
     print("=" * 60)
-    print("Full Body Exercise Tracker")
+    print("Full Body Exercise Tracker with Calibration")
     print("Author: Kabir Suri (codingkabs)")
     print("=" * 60)
-    print("\nFeatures:")
-    print("  - Push-up counter (detects when you go down and up)")
-    print("  - Body outline when standing")
+    print("\nCalibration Process:")
+    print("  1. Countdown 3, 2, 1 - Get into FIRST position (e.g., up)")
+    print("  2. Countdown 3, 2, 1 - Get into SECOND position (e.g., down)")
+    print("  3. Start exercising - Reps will be counted automatically")
+    print("\nControls:")
+    print("  - Press 'C' to recalibrate")
     print("  - Press 'R' to reset counter")
     print("  - Press 'F' to toggle fullscreen")
     print("  - Press ESC to exit\n")
     
-    pushup_tracker = PushUpTracker()
-    show_outline = False
-    fullscreen = False
+    exercise_tracker = ExerciseTracker()
+    exercise_type = "pushup"  # Can be "pushup", "shoulder_raise", "squat"
     
-    # Create window and set to fullscreen
+    # Calibration state machine
+    calibration_state = "waiting"  # waiting, countdown_1, capture_1, countdown_2, capture_2, exercising
+    countdown_number = 3
+    countdown_start_time = 0
+    capture_duration = 1.0  # How long to capture position (1 second)
+    capture_start_time = 0
+    captured_positions = []
+    
+    fullscreen = False
     cv2.namedWindow('Full Body Exercise Tracker', cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty('Full Body Exercise Tracker', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    fullscreen = True
     
     while True:
         frame, results = tracker.get_frame()
@@ -111,23 +168,18 @@ def main():
         # Get original frame dimensions
         original_height, original_width = frame.shape[:2]
         
-        # Get landmarks from original frame size (need full shape with channels)
+        # Get landmarks
         landmarks_dict = tracker.get_landmarks(results, frame.shape)
         
-        # Resize frame to fill screen better
-        # Get screen dimensions (adjust based on your screen resolution)
-        screen_width = 1920  # Common laptop screen width
-        screen_height = 1080  # Common laptop screen height
-        
-        # Resize frame to match screen while maintaining aspect ratio
+        # Resize for fullscreen if enabled
+        screen_width = 1920
+        screen_height = 1080
         scale = min(screen_width / original_width, screen_height / original_height)
         new_width = int(original_width * scale)
         new_height = int(original_height * scale)
-        
-        # Resize frame
         frame = cv2.resize(frame, (new_width, new_height))
         
-        # Scale landmarks to match resized frame
+        # Scale landmarks
         if landmarks_dict:
             scale_x = new_width / original_width
             scale_y = new_height / original_height
@@ -135,7 +187,6 @@ def main():
                 if landmarks_dict['landmarks'][key]:
                     x, y = landmarks_dict['landmarks'][key]
                     landmarks_dict['landmarks'][key] = (int(x * scale_x), int(y * scale_y))
-            # Update key points
             for key in ['left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
                         'left_wrist', 'right_wrist', 'left_hip', 'right_hip', 'left_knee',
                         'right_knee', 'left_ankle', 'right_ankle', 'nose']:
@@ -143,21 +194,18 @@ def main():
                     x, y = landmarks_dict[key]
                     landmarks_dict[key] = (int(x * scale_x), int(y * scale_y))
         
-        # If frame is smaller than screen, center it on black background
+        # Center frame if needed
         if new_width < screen_width or new_height < screen_height:
             black_frame = np.zeros((screen_height, screen_width, 3), dtype=np.uint8)
             x_offset = (screen_width - new_width) // 2
             y_offset = (screen_height - new_height) // 2
             black_frame[y_offset:y_offset+new_height, x_offset:x_offset+new_width] = frame
             frame = black_frame
-            
-            # Adjust landmark coordinates for centered frame
             if landmarks_dict:
                 for key in landmarks_dict['landmarks']:
                     if landmarks_dict['landmarks'][key]:
                         x, y = landmarks_dict['landmarks'][key]
                         landmarks_dict['landmarks'][key] = (x + x_offset, y + y_offset)
-                # Update key points
                 for key in ['left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
                             'left_wrist', 'right_wrist', 'left_hip', 'right_hip', 'left_knee',
                             'right_knee', 'left_ankle', 'right_ankle', 'nose']:
@@ -165,101 +213,175 @@ def main():
                         x, y = landmarks_dict[key]
                         landmarks_dict[key] = (x + x_offset, y + y_offset)
         
+        current_time = time.time()
+        
+        # Draw pose if detected
         if landmarks_dict:
-            # Draw pose skeleton
             tracker.draw_pose(frame, landmarks_dict['pose_landmarks'])
+        
+        # Calibration state machine
+        if calibration_state == "waiting":
+            cv2.putText(frame, "Press 'C' to start calibration", 
+                       (frame.shape[1] // 2 - 200, frame.shape[0] // 2),
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+            calibration_state = "ready"
+        
+        elif calibration_state == "countdown_1":
+            elapsed = current_time - countdown_start_time
+            if elapsed >= 1.0 and countdown_number > 0:
+                countdown_number -= 1
+                countdown_start_time = current_time
+                elapsed = 0
             
-            # Check if standing
-            is_standing = detect_standing(landmarks_dict)
-            if is_standing:
-                show_outline = True
-                # Draw body outline when standing
-                tracker.draw_body_outline(frame, landmarks_dict)
-            else:
-                show_outline = False
+            draw_countdown(frame, countdown_number, "Get into FIRST position")
             
-            # Push-up detection
-            left_shoulder = landmarks_dict.get('left_shoulder')
-            right_shoulder = landmarks_dict.get('right_shoulder')
-            left_wrist = landmarks_dict.get('left_wrist')
-            right_wrist = landmarks_dict.get('right_wrist')
-            left_hip = landmarks_dict.get('left_hip')
+            if countdown_number == 0 and elapsed >= 0.5:
+                calibration_state = "capture_1"
+                capture_start_time = current_time
+                captured_positions = []
+                countdown_number = 3
+        
+        elif calibration_state == "capture_1":
+            # Capture position for 1 second
+            if landmarks_dict:
+                key_y = get_key_point_y(landmarks_dict, exercise_type)
+                if key_y is not None:
+                    captured_positions.append(key_y)
             
-            # Use average of left and right for more stable detection
-            if left_shoulder and right_shoulder and left_wrist and right_wrist:
-                avg_shoulder_y = (left_shoulder[1] + right_shoulder[1]) / 2
-                avg_wrist_y = (left_wrist[1] + right_wrist[1]) / 2
-                hip_y = left_hip[1] if left_hip else avg_shoulder_y
+            elapsed = current_time - capture_start_time
+            if elapsed >= capture_duration:
+                # Average the captured positions
+                if captured_positions:
+                    avg_y = sum(captured_positions) / len(captured_positions)
+                    exercise_tracker.set_position_1(avg_y)
+                    cv2.putText(frame, "FIRST POSITION CAPTURED!", 
+                               (frame.shape[1] // 2 - 250, frame.shape[0] // 2),
+                               cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
+                    time.sleep(1)
                 
-                # Track push-up
-                rep_detected = pushup_tracker.update(avg_shoulder_y, avg_wrist_y, hip_y)
+                calibration_state = "countdown_2"
+                countdown_start_time = current_time
+                countdown_number = 3
+        
+        elif calibration_state == "countdown_2":
+            elapsed = current_time - countdown_start_time
+            if elapsed >= 1.0 and countdown_number > 0:
+                countdown_number -= 1
+                countdown_start_time = current_time
+                elapsed = 0
+            
+            draw_countdown(frame, countdown_number, "Get into SECOND position")
+            
+            if countdown_number == 0 and elapsed >= 0.5:
+                calibration_state = "capture_2"
+                capture_start_time = current_time
+                captured_positions = []
+                countdown_number = 3
+        
+        elif calibration_state == "capture_2":
+            # Capture position for 1 second
+            if landmarks_dict:
+                key_y = get_key_point_y(landmarks_dict, exercise_type)
+                if key_y is not None:
+                    captured_positions.append(key_y)
+            
+            elapsed = current_time - capture_start_time
+            if elapsed >= capture_duration:
+                # Average the captured positions
+                if captured_positions:
+                    avg_y = sum(captured_positions) / len(captured_positions)
+                    exercise_tracker.set_position_2(avg_y)
+                    cv2.putText(frame, "SECOND POSITION CAPTURED!", 
+                               (frame.shape[1] // 2 - 250, frame.shape[0] // 2),
+                               cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
+                    time.sleep(1)
                 
-                if rep_detected:
-                    cv2.putText(frame, "PUSH-UP!", (50, 100), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+                calibration_state = "exercising"
+                exercise_tracker.exercise_start_time = current_time
+        
+        elif calibration_state == "exercising":
+            # Track exercise reps
+            if landmarks_dict and exercise_tracker.is_calibrated:
+                key_y = get_key_point_y(landmarks_dict, exercise_type)
+                if key_y is not None:
+                    rep_detected = exercise_tracker.update(key_y)
+                    
+                    if rep_detected:
+                        cv2.putText(frame, "REP!", 
+                                   (frame.shape[1] // 2 - 100, 150),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
             
             # Display stats
-            cv2.putText(frame, f'Push-ups: {pushup_tracker.reps}', (50, 50), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
+            cv2.putText(frame, f'Reps: {exercise_tracker.reps}', (50, 50), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
             
-            elapsed_time = time.time() - pushup_tracker.exercise_start_time
-            cv2.putText(frame, f'Time: {int(elapsed_time)}s', (50, 100), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            elapsed_time = current_time - exercise_tracker.exercise_start_time
+            cv2.putText(frame, f'Time: {int(elapsed_time)}s', (50, 120), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 2)
             
-            if pushup_tracker.reps > 0:
-                avg_time = pushup_tracker.get_average_rep_time()
-                cv2.putText(frame, f'Avg: {avg_time:.1f}s/rep', (50, 140), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            if exercise_tracker.reps > 0:
+                avg_time = exercise_tracker.get_average_rep_time()
+                cv2.putText(frame, f'Avg: {avg_time:.1f}s/rep', (50, 170), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
             
-            # Status indicator
-            if show_outline:
-                cv2.putText(frame, "STANDING - Body Outline Active", 
-                           (50, frame.shape[0] - 60), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-            else:
-                cv2.putText(frame, "PUSH-UP MODE", 
-                           (50, frame.shape[0] - 60), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+            # Show current position indicator
+            if landmarks_dict and exercise_tracker.is_calibrated:
+                key_y = get_key_point_y(landmarks_dict, exercise_type)
+                if key_y is not None:
+                    dist_to_pos1 = abs(key_y - exercise_tracker.position_1)
+                    dist_to_pos2 = abs(key_y - exercise_tracker.position_2)
+                    
+                    if dist_to_pos1 < dist_to_pos2:
+                        pos_text = "Position 1"
+                        pos_color = (0, 255, 255)
+                    else:
+                        pos_text = "Position 2"
+                        pos_color = (255, 0, 255)
+                    
+                    cv2.putText(frame, pos_text, (50, frame.shape[0] - 100),
+                               cv2.FONT_HERSHEY_SIMPLEX, 1.5, pos_color, 3)
             
             # Progress bar
-            bar_width = 300
-            bar_height = 30
+            bar_width = 400
+            bar_height = 40
             bar_x = 50
-            bar_y = frame.shape[0] - 100
+            bar_y = frame.shape[0] - 150
             
-            # Draw background
             cv2.rectangle(frame, (bar_x, bar_y), 
                          (bar_x + bar_width, bar_y + bar_height), (100, 100, 100), -1)
             
-            # Draw progress (based on reps, goal of 10)
             goal = 10
-            progress = min((pushup_tracker.reps / goal) * 100, 100)
+            progress = min((exercise_tracker.reps / goal) * 100, 100)
             progress_width = int(bar_width * (progress / 100))
             cv2.rectangle(frame, (bar_x, bar_y), 
                          (bar_x + progress_width, bar_y + bar_height), (0, 255, 0), -1)
             
-            cv2.putText(frame, f'Progress: {pushup_tracker.reps}/{goal} ({int(progress)}%)', 
-                       (bar_x, bar_y - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        
-        else:
-            # No body detected
-            cv2.putText(frame, "No body detected - Stand in front of camera", 
-                       (50, frame.shape[0] // 2), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.putText(frame, f'Progress: {exercise_tracker.reps}/{goal} ({int(progress)}%)', 
+                       (bar_x, bar_y - 15), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         
         # Instructions
-        cv2.putText(frame, "Press 'R' to reset | ESC to exit", 
-                   (50, frame.shape[0] - 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        if calibration_state == "exercising":
+            cv2.putText(frame, "Press 'C' to recalibrate | 'R' to reset | ESC to exit", 
+                       (50, frame.shape[0] - 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        else:
+            cv2.putText(frame, "Press 'C' to calibrate | ESC to exit", 
+                       (50, frame.shape[0] - 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         
         cv2.imshow('Full Body Exercise Tracker', frame)
         
         key = cv2.waitKey(1) & 0xFF
         if key == 27:  # ESC
             break
+        elif key == ord('c') or key == ord('C'):  # Calibrate
+            exercise_tracker.reset()
+            calibration_state = "countdown_1"
+            countdown_number = 3
+            countdown_start_time = current_time
         elif key == ord('r') or key == ord('R'):  # Reset
-            pushup_tracker.reset()
+            exercise_tracker.reset()
         elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
             fullscreen = not fullscreen
             if fullscreen:
