@@ -5,6 +5,7 @@ Control volume with hand gestures (pinch to adjust)
 import cv2
 import numpy as np
 from base import HandTracker
+from fullscreen_helper import setup_fullscreen_window, resize_frame_for_fullscreen, toggle_fullscreen
 
 class VolumeControl:
     def __init__(self):
@@ -70,13 +71,19 @@ def main():
         return
     
     print("Air Volume Control - Press ESC to exit")
+    print("Press 'F' to toggle fullscreen")
     print("Pinch thumb and index finger to adjust volume")
     print("Open hand to stop controlling")
+    
+    fullscreen = setup_fullscreen_window('Air Volume Control', start_fullscreen=True)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
+        
+        # Resize for fullscreen
+        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         
@@ -120,8 +127,11 @@ def main():
         
         cv2.imshow('Air Volume Control', frame)
         
-        if cv2.waitKey(1) & 0xFF == 27:
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
             break
+        elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
+            fullscreen = toggle_fullscreen('Air Volume Control', fullscreen)
     
     tracker.release()
 

@@ -103,12 +103,18 @@ def main():
         return
     
     print("Hand Pose Analyzer - Press ESC to exit")
+    print("Press 'F' to toggle fullscreen")
     print("Keep your hand in a relaxed, natural position")
+    
+    fullscreen = setup_fullscreen_window('Hand Pose Analyzer', start_fullscreen=True)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
+        
+        # Resize for fullscreen
+        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         
@@ -171,8 +177,11 @@ def main():
         
         cv2.imshow('Hand Pose Analyzer', frame)
         
-        if cv2.waitKey(1) & 0xFF == 27:
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
             break
+        elif key == ord('f') or key == ord('F'):  # Toggle fullscreen
+            fullscreen = toggle_fullscreen('Hand Pose Analyzer', fullscreen)
     
     tracker.release()
 
