@@ -111,8 +111,8 @@ def main():
         # Get original frame dimensions
         original_height, original_width = frame.shape[:2]
         
-        # Get landmarks from original frame size
-        landmarks_dict = tracker.get_landmarks(results, (original_height, original_width))
+        # Get landmarks from original frame size (need full shape with channels)
+        landmarks_dict = tracker.get_landmarks(results, frame.shape)
         
         # Resize frame to fill screen better
         # Get screen dimensions (adjust based on your screen resolution)

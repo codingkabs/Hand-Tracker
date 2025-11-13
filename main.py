@@ -123,15 +123,12 @@ def main():
     print("  - ESC: Exit\n")
     
     frame_count = 0
-    fullscreen = setup_fullscreen_window('Hand Tracking AR UI - Enhanced', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('Hand Tracking AR UI - Enhanced', start_fullscreen=False)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
-        
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         frame_count += 1
         pulse = frame_count * 0.1  # For animation

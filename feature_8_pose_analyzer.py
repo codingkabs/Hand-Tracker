@@ -106,15 +106,12 @@ def main():
     print("Press 'F' to toggle fullscreen")
     print("Keep your hand in a relaxed, natural position")
     
-    fullscreen = setup_fullscreen_window('Hand Pose Analyzer', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('Hand Pose Analyzer', start_fullscreen=False)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
-        
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         

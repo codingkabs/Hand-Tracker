@@ -296,16 +296,14 @@ def main():
     letter_count = 0
     learning_mode = False
     last_button_state = False  # For button debounce
-    fullscreen = setup_fullscreen_window('ASL Sign Language Detector', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('ASL Sign Language Detector', start_fullscreen=False)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
         
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
-        
+        # Get landmarks from frame
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         
         detected_letter = "No Hand"

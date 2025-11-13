@@ -59,7 +59,7 @@ def main():
     print("  - Fist: Toggle erase/draw mode")
     print("  - Open hand (5 fingers): Change color")
     
-    fullscreen = setup_fullscreen_window('Virtual Drawing', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('Virtual Drawing', start_fullscreen=False)
     canvas = VirtualCanvas(1920, 1080)  # Match fullscreen size
     erase_mode = False
     last_finger_count = 0
@@ -70,8 +70,6 @@ def main():
         if frame is None:
             break
         
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
         # Resize canvas to match frame
         if frame.shape[:2] != canvas.canvas.shape[:2]:
             canvas.canvas = cv2.resize(canvas.canvas, (frame.shape[1], frame.shape[0]))

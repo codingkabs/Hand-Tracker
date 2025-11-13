@@ -107,7 +107,7 @@ def main():
     print("Press 'F' to toggle fullscreen")
     print("Point your index finger at keys to play notes!")
     
-    fullscreen = setup_fullscreen_window('Air Piano', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('Air Piano', start_fullscreen=False)
     piano = None
     last_note = None
     note_display_time = 0
@@ -116,9 +116,6 @@ def main():
         frame, results = tracker.get_frame()
         if frame is None:
             break
-        
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         # Initialize piano with frame dimensions
         if piano is None:

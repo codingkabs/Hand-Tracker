@@ -17,15 +17,12 @@ def main():
     print("Press 'F' to toggle fullscreen")
     print("Show your hand and see how many fingers are detected!")
     
-    fullscreen = setup_fullscreen_window('Finger Counter', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('Finger Counter', start_fullscreen=False)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
-        
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         

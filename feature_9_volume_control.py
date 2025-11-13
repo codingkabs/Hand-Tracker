@@ -75,15 +75,12 @@ def main():
     print("Pinch thumb and index finger to adjust volume")
     print("Open hand to stop controlling")
     
-    fullscreen = setup_fullscreen_window('Air Volume Control', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('Air Volume Control', start_fullscreen=False)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
-        
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         

@@ -81,15 +81,12 @@ def main():
     computer_choice = None
     result_text = None
     last_frame_time = time.time()
-    fullscreen = setup_fullscreen_window('Rock Paper Scissors', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('Rock Paper Scissors', start_fullscreen=False)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
-        
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         current_time = time.time()
         frame_time = current_time - last_frame_time

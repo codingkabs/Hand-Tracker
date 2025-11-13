@@ -74,15 +74,12 @@ def main():
     print("AR UI Overlay - Press ESC to exit")
     print("Press 'F' to toggle fullscreen")
     
-    fullscreen = setup_fullscreen_window('Hand Tracking AR UI', start_fullscreen=True)
+    fullscreen = setup_fullscreen_window('Hand Tracking AR UI', start_fullscreen=False)
     
     while True:
         frame, results = tracker.get_frame()
         if frame is None:
             break
-        
-        # Resize for fullscreen
-        frame, offset_info = resize_frame_for_fullscreen(frame)
         
         landmarks_list = tracker.get_landmarks(results, frame.shape)
         
